@@ -1,0 +1,54 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.26124.0
+MinimumVisualStudioVersion = 15.0.26124.0
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{0C551FF6-0EED-406E-A3D9-BC6A1785AF97}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SoundShell.Audio", "src\SoundShell.Audio\SoundShell.Audio.csproj", "{FFA08E7F-9690-42E1-8104-55D5CE2EE3A9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SoundShell.PoC", "src\SoundShell.PoC\SoundShell.PoC.csproj", "{AC5A7B51-DF16-4311-954D-65E87B03764A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{FFA08E7F-9690-42E1-8104-55D5CE2EE3A9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FFA08E7F-9690-42E1-8104-55D5CE2EE3A9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FFA08E7F-9690-42E1-8104-55D5CE2EE3A9}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{FFA08E7F-9690-42E1-8104-55D5CE2EE3A9}.Debug|x64.Build.0 = Debug|Any CPU
+		{FFA08E7F-9690-42E1-8104-55D5CE2EE3A9}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{FFA08E7F-9690-42E1-8104-55D5CE2EE3A9}.Debug|x86.Build.0 = Debug|Any CPU
+		{FFA08E7F-9690-42E1-8104-55D5CE2EE3A9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FFA08E7F-9690-42E1-8104-55D5CE2EE3A9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FFA08E7F-9690-42E1-8104-55D5CE2EE3A9}.Release|x64.ActiveCfg = Release|Any CPU
+		{FFA08E7F-9690-42E1-8104-55D5CE2EE3A9}.Release|x64.Build.0 = Release|Any CPU
+		{FFA08E7F-9690-42E1-8104-55D5CE2EE3A9}.Release|x86.ActiveCfg = Release|Any CPU
+		{FFA08E7F-9690-42E1-8104-55D5CE2EE3A9}.Release|x86.Build.0 = Release|Any CPU
+		{AC5A7B51-DF16-4311-954D-65E87B03764A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AC5A7B51-DF16-4311-954D-65E87B03764A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AC5A7B51-DF16-4311-954D-65E87B03764A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{AC5A7B51-DF16-4311-954D-65E87B03764A}.Debug|x64.Build.0 = Debug|Any CPU
+		{AC5A7B51-DF16-4311-954D-65E87B03764A}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{AC5A7B51-DF16-4311-954D-65E87B03764A}.Debug|x86.Build.0 = Debug|Any CPU
+		{AC5A7B51-DF16-4311-954D-65E87B03764A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AC5A7B51-DF16-4311-954D-65E87B03764A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AC5A7B51-DF16-4311-954D-65E87B03764A}.Release|x64.ActiveCfg = Release|Any CPU
+		{AC5A7B51-DF16-4311-954D-65E87B03764A}.Release|x64.Build.0 = Release|Any CPU
+		{AC5A7B51-DF16-4311-954D-65E87B03764A}.Release|x86.ActiveCfg = Release|Any CPU
+		{AC5A7B51-DF16-4311-954D-65E87B03764A}.Release|x86.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{FFA08E7F-9690-42E1-8104-55D5CE2EE3A9} = {0C551FF6-0EED-406E-A3D9-BC6A1785AF97}
+		{AC5A7B51-DF16-4311-954D-65E87B03764A} = {0C551FF6-0EED-406E-A3D9-BC6A1785AF97}
+	EndGlobalSection
+EndGlobal

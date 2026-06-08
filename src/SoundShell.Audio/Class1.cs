@@ -55,6 +55,7 @@ namespace SoundShell.Audio
         private readonly System.Collections.Concurrent.ConcurrentDictionary<string, AudioSessionInfo> knownSessions = new System.Collections.Concurrent.ConcurrentDictionary<string, AudioSessionInfo>(StringComparer.OrdinalIgnoreCase);
         private object comNotification;
         private bool comRegistered;
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, object> perSessionSinks = new System.Collections.Concurrent.ConcurrentDictionary<string, object>(StringComparer.OrdinalIgnoreCase);
 
         public IReadOnlyList<AudioSessionInfo> GetAudioSessions()
         {
@@ -121,7 +122,10 @@ namespace SoundShell.Audio
                             // initial population
                             var current = GetAudioSessions();
                             foreach (var s in current)
+                            {
                                 knownSessions[s.SessionIdentifier] = s;
+                                try { RegisterPerSessionEventsById(s.SessionIdentifier); } catch { }
+                            }
 
                             while (!ct.IsCancellationRequested)
                             {
@@ -135,6 +139,7 @@ namespace SoundShell.Audio
                                     if (!knownSessions.ContainsKey(kv.Key))
                                     {
                                         knownSessions[kv.Key] = kv.Value;
+                                        try { RegisterPerSessionEventsById(kv.Key); } catch { }
                                         SessionChanged?.Invoke(this, new AudioSessionChangedEventArgs { Session = kv.Value, ChangeType = AudioSessionChangeType.Created });
                                     }
                                 }
@@ -289,6 +294,49 @@ namespace SoundShell.Audio
             throw new InvalidOperationException($"Audio session '{sessionIdentifier}' not found.");
         }
 
+        private void RegisterPerSessionEventsById(string sessionIdentifier)
+        {
+            // find AudioSessionControl for identifier
+            using var device = deviceEnumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+            var sessionManager = device.AudioSessionManager;
+            var enumerator = sessionManager.Sessions;
+
+            for (var i = 0; i < enumerator.Count; i++)
+            {
+                using var sessionControl = enumerator[i];
+                if (sessionControl == null)
+                    continue;
+
+                if (string.Equals(sessionControl.GetSessionIdentifier, sessionIdentifier, StringComparison.OrdinalIgnoreCase))
+                {
+                    RegisterPerSessionEvents(sessionControl, sessionIdentifier);
+                    return;
+                }
+            }
+        }
+
+        private void RegisterPerSessionEvents(AudioSessionControl sessionControl, string sessionIdentifier)
+        {
+            if (perSessionSinks.ContainsKey(sessionIdentifier))
+                return;
+            var sink = new AudioSessionEventsSink(this, sessionIdentifier);
+
+            // Try common registration method names via dynamic (safer).
+            try
+            {
+                dynamic dyn = sessionControl;
+                try { dyn.RegisterEventCallback(sink); } catch { }
+                try { dyn.RegisterAudioSessionNotification(sink); } catch { }
+                try { dyn.RegisterSessionNotification(sink); } catch { }
+                try { dyn.RegisterAudioSessionEvents(sink); } catch { }
+            }
+            catch { }
+
+            perSessionSinks[sessionIdentifier] = sink;
+        }
+
+        
+
         // COM interop: IAudioSessionNotification sink
         [ComImport]
         [Guid("641DD20B-4D41-49CC-ABA3-174B9477BB08")]
@@ -319,6 +367,7 @@ namespace SoundShell.Audio
                     {
                         var info = CreateSessionInfo(sessionControl);
                         parent.knownSessions[info.SessionIdentifier] = info;
+                        try { parent.RegisterPerSessionEvents(sessionControl, info.SessionIdentifier); } catch { }
                         parent.SessionChanged?.Invoke(parent, new AudioSessionChangedEventArgs { Session = info, ChangeType = AudioSessionChangeType.Created });
                     }
                 }
@@ -326,6 +375,59 @@ namespace SoundShell.Audio
 
                 return 0; // S_OK
             }
+        }
+
+        [ComImport]
+        [Guid("24918ACC-64B3-37C1-8CA9-74A66E1F6F11")]
+        [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IAudioSessionEvents
+        {
+            void OnDisplayNameChanged([MarshalAs(UnmanagedType.LPWStr)] string NewDisplayName, ref Guid EventContext);
+            void OnIconPathChanged([MarshalAs(UnmanagedType.LPWStr)] string NewIconPath, ref Guid EventContext);
+            void OnSimpleVolumeChanged(float NewVolume, bool NewMute, ref Guid EventContext);
+            void OnChannelVolumeChanged(uint ChannelCount, IntPtr NewChannelVolumeArray, uint ChangedChannel, ref Guid EventContext);
+            void OnGroupingParamChanged(ref Guid NewGroupingParam, ref Guid EventContext);
+            void OnStateChanged(int NewState);
+            void OnSessionDisconnected(int DisconnectReason);
+        }
+
+        [ComVisible(true)]
+        [ClassInterface(ClassInterfaceType.None)]
+        private class AudioSessionEventsSink : IAudioSessionEvents
+        {
+            private readonly WindowsAudioSessionService parent;
+            private readonly string sessionId;
+
+            public AudioSessionEventsSink(WindowsAudioSessionService parent, string sessionId)
+            {
+                this.parent = parent;
+                this.sessionId = sessionId;
+            }
+
+            public void OnDisplayNameChanged(string NewDisplayName, ref Guid EventContext) { }
+            public void OnIconPathChanged(string NewIconPath, ref Guid EventContext) { }
+
+            public void OnSimpleVolumeChanged(float NewVolume, bool NewMute, ref Guid EventContext)
+            {
+                try
+                {
+                    var updated = parent.GetAudioSessions().FirstOrDefault(s => string.Equals(s.SessionIdentifier, sessionId, StringComparison.OrdinalIgnoreCase));
+                    if (updated != null)
+                    {
+                        var change = AudioSessionChangeType.VolumeChanged;
+                        if (updated.IsMuted != NewMute)
+                            change = AudioSessionChangeType.MutedChanged;
+                        parent.knownSessions[sessionId] = updated;
+                        parent.SessionChanged?.Invoke(parent, new AudioSessionChangedEventArgs { Session = updated, ChangeType = change });
+                    }
+                }
+                catch { }
+            }
+
+            public void OnChannelVolumeChanged(uint ChannelCount, IntPtr NewChannelVolumeArray, uint ChangedChannel, ref Guid EventContext) { }
+            public void OnGroupingParamChanged(ref Guid NewGroupingParam, ref Guid EventContext) { }
+            public void OnStateChanged(int NewState) { }
+            public void OnSessionDisconnected(int DisconnectReason) { }
         }
 
         public void Dispose()

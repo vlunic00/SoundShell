@@ -21,17 +21,37 @@ namespace SoundShell.Audio
             => $"[{SessionIdentifier}] {ProcessName} (PID={ProcessId}) {DisplayName} Volume={Volume:P0} Muted={IsMuted} SystemSounds={IsSystemSounds}";
     }
 
+    public enum AudioSessionChangeType
+    {
+        Created,
+        Removed,
+        VolumeChanged,
+        MutedChanged
+    }
+
+    public sealed class AudioSessionChangedEventArgs : EventArgs
+    {
+        public AudioSessionInfo Session { get; init; }
+        public AudioSessionChangeType ChangeType { get; init; }
+    }
+
     public interface IAudioSessionService : IDisposable
     {
         IReadOnlyList<AudioSessionInfo> GetAudioSessions();
         void SetSessionVolume(string sessionIdentifier, float volume);
         void SetSessionMute(string sessionIdentifier, bool isMuted);
+        event EventHandler<AudioSessionChangedEventArgs> SessionChanged;
+        void StartMonitoring();
+        void StopMonitoring();
         AudioSessionInfo FindSessionByProcessName(string processName);
     }
 
     public sealed class WindowsAudioSessionService : IAudioSessionService
     {
         private readonly MMDeviceEnumerator deviceEnumerator = new MMDeviceEnumerator();
+        private System.Threading.CancellationTokenSource monitorCts;
+        private readonly object monitorLock = new object();
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, AudioSessionInfo> knownSessions = new System.Collections.Concurrent.ConcurrentDictionary<string, AudioSessionInfo>(StringComparer.OrdinalIgnoreCase);
 
         public IReadOnlyList<AudioSessionInfo> GetAudioSessions()
         {
@@ -50,6 +70,90 @@ namespace SoundShell.Audio
             }
 
             return sessions;
+        }
+
+        public event EventHandler<AudioSessionChangedEventArgs> SessionChanged;
+
+        public void StartMonitoring()
+        {
+            lock (monitorLock)
+            {
+                if (monitorCts != null)
+                    return;
+
+                monitorCts = new System.Threading.CancellationTokenSource();
+                var ct = monitorCts.Token;
+                System.Threading.Tasks.Task.Run(async () =>
+                {
+                    try
+                    {
+                        // initial population
+                        var current = GetAudioSessions();
+                        foreach (var s in current)
+                            knownSessions[s.SessionIdentifier] = s;
+
+                        while (!ct.IsCancellationRequested)
+                        {
+                            await System.Threading.Tasks.Task.Delay(800, ct).ConfigureAwait(false);
+                            var sessions = GetAudioSessions();
+                            var snapshot = sessions.ToDictionary(s => s.SessionIdentifier, StringComparer.OrdinalIgnoreCase);
+
+                            // detect created
+                            foreach (var kv in snapshot)
+                            {
+                                if (!knownSessions.ContainsKey(kv.Key))
+                                {
+                                    knownSessions[kv.Key] = kv.Value;
+                                    SessionChanged?.Invoke(this, new AudioSessionChangedEventArgs { Session = kv.Value, ChangeType = AudioSessionChangeType.Created });
+                                }
+                            }
+
+                            // detect removed
+                            foreach (var key in knownSessions.Keys)
+                            {
+                                if (!snapshot.ContainsKey(key))
+                                {
+                                    if (knownSessions.TryRemove(key, out var removed))
+                                        SessionChanged?.Invoke(this, new AudioSessionChangedEventArgs { Session = removed, ChangeType = AudioSessionChangeType.Removed });
+                                }
+                            }
+
+                            // detect volume/mute changes
+                            foreach (var kv in snapshot)
+                            {
+                                if (knownSessions.TryGetValue(kv.Key, out var old))
+                                {
+                                    var neu = kv.Value;
+                                    if (Math.Abs(old.Volume - neu.Volume) > 0.0001f)
+                                    {
+                                        knownSessions[kv.Key] = neu;
+                                        SessionChanged?.Invoke(this, new AudioSessionChangedEventArgs { Session = neu, ChangeType = AudioSessionChangeType.VolumeChanged });
+                                    }
+                                    else if (old.IsMuted != neu.IsMuted)
+                                    {
+                                        knownSessions[kv.Key] = neu;
+                                        SessionChanged?.Invoke(this, new AudioSessionChangedEventArgs { Session = neu, ChangeType = AudioSessionChangeType.MutedChanged });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (OperationCanceledException) { }
+                }, ct);
+            }
+        }
+
+        public void StopMonitoring()
+        {
+            lock (monitorLock)
+            {
+                if (monitorCts == null)
+                    return;
+                monitorCts.Cancel();
+                monitorCts.Dispose();
+                monitorCts = null;
+                knownSessions.Clear();
+            }
         }
 
         public AudioSessionInfo FindSessionByProcessName(string processName)
@@ -134,6 +238,7 @@ namespace SoundShell.Audio
 
         public void Dispose()
         {
+            StopMonitoring();
             deviceEnumerator.Dispose();
         }
     }

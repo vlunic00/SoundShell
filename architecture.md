@@ -13,6 +13,8 @@ Build a native Windows utility that allows independent volume control for indivi
 ## Implementation Phases
 1. **Phase 1 (Spike):** Create a .NET Console App to find a specific process (like 'chrome') and adjust its `SimpleAudioVolume` using NAudio.
 2. **Phase 2 (Service):** Implement `WindowsAudioService` utilizing `IAudioSessionNotification` to react to OS audio session events without aggressive polling.
+
+Implementation note (current): a lightweight event model was added to the audio library exposing session lifecycle and property-change events. To ensure broad compatibility while a COM-based notification wrapper is prepared, the current PoC implementation uses a short-interval (800ms) polling loop as a pragmatic fallback that raises events for session Created/Removed/VolumeChanged/MutedChanged. This is intentionally designed to be replaceable by a proper `IAudioSessionNotification` registration once a stable wrapper is implemented.
 3. **Phase 3 (UI):** Build a WinUI 3 interface displaying process names, extracted icons, and volume sliders data-bound to the audio service.
 4. **Phase 4 (System):** Minimize to System Tray and configure the app package with `runFullTrust` capability to bypass UWP sandboxing.
 

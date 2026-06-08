@@ -30,6 +30,9 @@ namespace SoundShell.PoC
                     case "mute":
                         RunMute(audioService, args, true);
                         break;
+                    case "watch":
+                        RunWatch(audioService);
+                        break;
                     case "unmute":
                         RunMute(audioService, args, false);
                         break;
@@ -118,12 +121,34 @@ namespace SoundShell.PoC
             Console.WriteLine("  list");
             Console.WriteLine("  set-volume <session-id-or-index> <0.0-1.0>");
             Console.WriteLine("  mute <session-id-or-index>");
+            Console.WriteLine("  watch");
             Console.WriteLine("  unmute <session-id-or-index>");
             Console.WriteLine();
             Console.WriteLine("Examples:");
             Console.WriteLine("  SoundShell.PoC list");
             Console.WriteLine("  SoundShell.PoC set-volume 1 0.5");
             Console.WriteLine("  SoundShell.PoC mute {sessionId}");
+        }
+
+        private static void RunWatch(IAudioSessionService audioService)
+        {
+            Console.WriteLine("Entering watch mode. Press Enter to exit.");
+            void Handler(object s, AudioSessionChangedEventArgs e)
+            {
+                Console.WriteLine($"[{e.ChangeType}] {e.Session.ProcessName} (PID={e.Session.ProcessId}) Volume={e.Session.Volume:P0} Muted={e.Session.IsMuted} Id={e.Session.SessionIdentifier}");
+            }
+
+            audioService.SessionChanged += Handler;
+            try
+            {
+                audioService.StartMonitoring();
+                Console.ReadLine();
+            }
+            finally
+            {
+                audioService.StopMonitoring();
+                audioService.SessionChanged -= Handler;
+            }
         }
     }
 }

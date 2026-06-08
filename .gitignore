@@ -17,3 +17,6 @@ packages/
 
 # Logs
 *.log
+
+# Markdown files
+architecture.md

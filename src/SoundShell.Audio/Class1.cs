@@ -55,7 +55,13 @@ namespace SoundShell.Audio
         private readonly System.Collections.Concurrent.ConcurrentDictionary<string, AudioSessionInfo> knownSessions = new System.Collections.Concurrent.ConcurrentDictionary<string, AudioSessionInfo>(StringComparer.OrdinalIgnoreCase);
         private object comNotification;
         private bool comRegistered;
-        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, object> perSessionSinks = new System.Collections.Concurrent.ConcurrentDictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, RegisteredSession> perSessionSinks = new System.Collections.Concurrent.ConcurrentDictionary<string, RegisteredSession>(StringComparer.OrdinalIgnoreCase);
+
+        private sealed class RegisteredSession
+        {
+            public IAudioSessionEvents Events { get; set; }
+            public IAudioSessionControl NativeControl { get; set; }
+        }
 
         public IReadOnlyList<AudioSessionInfo> GetAudioSessions()
         {
@@ -294,6 +300,35 @@ namespace SoundShell.Audio
             throw new InvalidOperationException($"Audio session '{sessionIdentifier}' not found.");
         }
 
+        private IAudioSessionControl GetNativeSessionControl(AudioSessionControl sessionControl)
+        {
+            var pUnk = IntPtr.Zero;
+            try
+            {
+                pUnk = Marshal.GetIUnknownForObject(sessionControl);
+                var iid = new Guid("F4B1A599-7266-4319-A8CA-E70ACB11E8CD"); // IAudioSessionControl
+                var hr = Marshal.QueryInterface(pUnk, ref iid, out var ppv);
+                if (hr != 0 || ppv == IntPtr.Zero)
+                    return null;
+
+                try
+                {
+                    var native = (IAudioSessionControl)Marshal.GetTypedObjectForIUnknown(ppv, typeof(IAudioSessionControl));
+                    return native;
+                }
+                finally
+                {
+                    Marshal.Release(ppv);
+                }
+            }
+            catch { return null; }
+            finally
+            {
+                if (pUnk != IntPtr.Zero)
+                    Marshal.Release(pUnk);
+            }
+        }
+
         private void RegisterPerSessionEventsById(string sessionIdentifier)
         {
             // find AudioSessionControl for identifier
@@ -319,9 +354,27 @@ namespace SoundShell.Audio
         {
             if (perSessionSinks.ContainsKey(sessionIdentifier))
                 return;
+
             var sink = new AudioSessionEventsSink(this, sessionIdentifier);
 
-            // Try common registration method names via dynamic (safer).
+            // Try typed COM registration via IAudioSessionControl
+            try
+            {
+                var native = GetNativeSessionControl(sessionControl);
+                if (native != null)
+                {
+                    try
+                    {
+                        native.RegisterAudioSessionNotification(sink);
+                        perSessionSinks[sessionIdentifier] = new RegisteredSession { Events = sink, NativeControl = native };
+                        return;
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+
+            // Fallback: try common registration method names via dynamic
             try
             {
                 dynamic dyn = sessionControl;
@@ -332,7 +385,22 @@ namespace SoundShell.Audio
             }
             catch { }
 
-            perSessionSinks[sessionIdentifier] = sink;
+            perSessionSinks[sessionIdentifier] = new RegisteredSession { Events = sink, NativeControl = null };
+        }
+
+        private void UnregisterPerSessionEventsById(string sessionIdentifier)
+        {
+            if (!perSessionSinks.TryRemove(sessionIdentifier, out var registered))
+                return;
+
+            try
+            {
+                if (registered.NativeControl != null && registered.Events != null)
+                {
+                    try { registered.NativeControl.UnregisterAudioSessionNotification(registered.Events); } catch { }
+                }
+            }
+            catch { }
         }
 
         
@@ -345,6 +413,22 @@ namespace SoundShell.Audio
         {
             [PreserveSig]
             int OnSessionCreated(IntPtr newSession);
+        }
+
+        [ComImport]
+        [Guid("F4B1A599-7266-4319-A8CA-E70ACB11E8CD")]
+        [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        private interface IAudioSessionControl
+        {
+            int GetState(out int pRetVal);
+            int GetDisplayName([MarshalAs(UnmanagedType.LPWStr)] out string pRetVal);
+            int SetDisplayName([MarshalAs(UnmanagedType.LPWStr)] string Value, ref Guid EventContext);
+            int GetIconPath([MarshalAs(UnmanagedType.LPWStr)] out string pRetVal);
+            int SetIconPath([MarshalAs(UnmanagedType.LPWStr)] string Value, ref Guid EventContext);
+            int GetGroupingParam(out Guid pRetVal);
+            int SetGroupingParam(ref Guid Grouping, ref Guid EventContext);
+            int RegisterAudioSessionNotification([MarshalAs(UnmanagedType.Interface)] IAudioSessionEvents NewNotifications);
+            int UnregisterAudioSessionNotification([MarshalAs(UnmanagedType.Interface)] IAudioSessionEvents NewNotifications);
         }
 
         [ComVisible(true)]

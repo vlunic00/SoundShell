@@ -4,6 +4,8 @@ using System.Diagnostics;
 using System.Linq;
 using NAudio.CoreAudioApi;
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace SoundShell.Audio
 {
@@ -49,8 +51,16 @@ namespace SoundShell.Audio
 
     public sealed class WindowsAudioSessionService : IAudioSessionService
     {
+        private readonly ILogger<WindowsAudioSessionService> _logger;
+
+        public WindowsAudioSessionService() : this(NullLogger<WindowsAudioSessionService>.Instance) { }
+
+        public WindowsAudioSessionService(ILogger<WindowsAudioSessionService> logger)
+        {
+            _logger = logger ?? NullLogger<WindowsAudioSessionService>.Instance;
+        }
+
         private readonly MMDeviceEnumerator deviceEnumerator = new MMDeviceEnumerator();
-        private System.Threading.CancellationTokenSource monitorCts;
         private readonly object monitorLock = new object();
         private readonly System.Collections.Concurrent.ConcurrentDictionary<string, AudioSessionInfo> knownSessions = new System.Collections.Concurrent.ConcurrentDictionary<string, AudioSessionInfo>(StringComparer.OrdinalIgnoreCase);
         private object comNotification;
@@ -88,100 +98,44 @@ namespace SoundShell.Audio
         {
             lock (monitorLock)
             {
-                if (monitorCts != null)
+                if (comRegistered)
                     return;
 
-                // Try to register COM-based session notifications. If that fails, fall back to polling.
+                // Attempt to register COM-based session notifications. If successful,
+                // also register per-session sinks for existing sessions.
                 try
                 {
                     using var device = deviceEnumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
                     var sessionManager = device.AudioSessionManager;
-                    // create COM-visible notification sink
+
                     var sink = new AudioSessionNotificationSink(this);
-                    // attempt to register via dynamic call to avoid explicit dependency on NAudio internals
                     try
                     {
                         dynamic dyn = sessionManager;
                         dyn.RegisterSessionNotification(sink);
                         comNotification = sink;
                         comRegistered = true;
-                    }
-                    catch
-                    {
-                        // registration failed - fall back to polling below
-                    }
-                }
-                catch
-                {
-                    // ignore and fall back to polling
-                }
 
-                // if COM registration not available, start polling loop
-                if (!comRegistered)
-                {
-                    monitorCts = new System.Threading.CancellationTokenSource();
-                    var ct = monitorCts.Token;
-                    System.Threading.Tasks.Task.Run(async () =>
-                    {
-                        try
+                        // Register per-session event sinks for currently active sessions
+                        var sessions = GetAudioSessions();
+                        foreach (var s in sessions)
                         {
-                            // initial population
-                            var current = GetAudioSessions();
-                            foreach (var s in current)
-                            {
-                                knownSessions[s.SessionIdentifier] = s;
-                                try { RegisterPerSessionEventsById(s.SessionIdentifier); } catch { }
-                            }
-
-                            while (!ct.IsCancellationRequested)
-                            {
-                                await System.Threading.Tasks.Task.Delay(800, ct).ConfigureAwait(false);
-                                var sessions = GetAudioSessions();
-                                var snapshot = sessions.ToDictionary(s => s.SessionIdentifier, StringComparer.OrdinalIgnoreCase);
-
-                                // detect created
-                                foreach (var kv in snapshot)
-                                {
-                                    if (!knownSessions.ContainsKey(kv.Key))
-                                    {
-                                        knownSessions[kv.Key] = kv.Value;
-                                        try { RegisterPerSessionEventsById(kv.Key); } catch { }
-                                        SessionChanged?.Invoke(this, new AudioSessionChangedEventArgs { Session = kv.Value, ChangeType = AudioSessionChangeType.Created });
-                                    }
-                                }
-
-                                // detect removed
-                                foreach (var key in knownSessions.Keys)
-                                {
-                                    if (!snapshot.ContainsKey(key))
-                                    {
-                                        if (knownSessions.TryRemove(key, out var removed))
-                                            SessionChanged?.Invoke(this, new AudioSessionChangedEventArgs { Session = removed, ChangeType = AudioSessionChangeType.Removed });
-                                    }
-                                }
-
-                                // detect volume/mute changes
-                                foreach (var kv in snapshot)
-                                {
-                                    if (knownSessions.TryGetValue(kv.Key, out var old))
-                                    {
-                                        var neu = kv.Value;
-                                        if (Math.Abs(old.Volume - neu.Volume) > 0.0001f)
-                                        {
-                                            knownSessions[kv.Key] = neu;
-                                            SessionChanged?.Invoke(this, new AudioSessionChangedEventArgs { Session = neu, ChangeType = AudioSessionChangeType.VolumeChanged });
-                                        }
-                                        else if (old.IsMuted != neu.IsMuted)
-                                        {
-                                            knownSessions[kv.Key] = neu;
-                                            SessionChanged?.Invoke(this, new AudioSessionChangedEventArgs { Session = neu, ChangeType = AudioSessionChangeType.MutedChanged });
-                                        }
-                                    }
-                                }
-                            }
+                            knownSessions[s.SessionIdentifier] = s;
+                            try { RegisterPerSessionEventsById(s.SessionIdentifier); } catch (Exception ex) { _logger.LogWarning(ex, "RegisterPerSessionEventsById failed for {SessionId}", s.SessionIdentifier); }
                         }
-                        catch (OperationCanceledException) { }
-                    }, ct);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to RegisterSessionNotification. Monitoring disabled.");
+                        comNotification = null;
+                        comRegistered = false;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to obtain session manager for monitoring.");
+                    comNotification = null;
+                    comRegistered = false;
                 }
             }
         }
@@ -202,18 +156,24 @@ namespace SoundShell.Audio
                             dynamic dyn = sessionManager;
                             dyn.UnregisterSessionNotification(comNotification);
                         }
-                        catch { }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to unregister session notification");
+                        }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed while attempting to unregister session notification");
+                    }
+
                     comNotification = null;
                     comRegistered = false;
                 }
 
-                if (monitorCts != null)
+                // Unregister any per-session sinks and release COM references
+                foreach (var kv in perSessionSinks.Keys.ToList())
                 {
-                    monitorCts.Cancel();
-                    monitorCts.Dispose();
-                    monitorCts = null;
+                    try { UnregisterPerSessionEventsById(kv); } catch (Exception ex) { _logger.LogWarning(ex, "Error unregistering per-session sink {SessionId}", kv); }
                 }
 
                 knownSessions.Clear();
@@ -397,10 +357,32 @@ namespace SoundShell.Audio
             {
                 if (registered.NativeControl != null && registered.Events != null)
                 {
-                    try { registered.NativeControl.UnregisterAudioSessionNotification(registered.Events); } catch { }
+                    try
+                    {
+                        registered.NativeControl.UnregisterAudioSessionNotification(registered.Events);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Error while UnregisterAudioSessionNotification for {SessionId}", sessionIdentifier);
+                    }
+
+                    try
+                    {
+                        // Release underlying COM reference for native control
+                        Marshal.ReleaseComObject(registered.NativeControl);
+                    }
+                    catch { }
+                }
+
+                if (registered.Events != null)
+                {
+                    try { Marshal.ReleaseComObject(registered.Events); } catch { }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to fully unregister per-session events for {SessionId}", sessionIdentifier);
+            }
         }
 
         
@@ -451,7 +433,14 @@ namespace SoundShell.Audio
                     {
                         var info = CreateSessionInfo(sessionControl);
                         parent.knownSessions[info.SessionIdentifier] = info;
-                        try { parent.RegisterPerSessionEvents(sessionControl, info.SessionIdentifier); } catch { }
+                            try
+                            {
+                                parent.RegisterPerSessionEvents(sessionControl, info.SessionIdentifier);
+                            }
+                            catch (Exception ex)
+                            {
+                                parent._logger.LogWarning(ex, "Failed to register per-session sink for {SessionId}", info.SessionIdentifier);
+                            }
                         parent.SessionChanged?.Invoke(parent, new AudioSessionChangedEventArgs { Session = info, ChangeType = AudioSessionChangeType.Created });
                     }
                 }

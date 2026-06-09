@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Globalization;
 using SoundShell.Audio;
+using Microsoft.Extensions.Logging;
 
 namespace SoundShell.PoC
 {
@@ -8,9 +9,11 @@ namespace SoundShell.PoC
     {
         static void Main(string[] args)
         {
+            using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Information));
+            var logger = loggerFactory.CreateLogger<WindowsAudioSessionService>();
             try
             {
-                using var audioService = new WindowsAudioSessionService();
+                using var audioService = new WindowsAudioSessionService(logger);
                 if (args.Length == 0)
                 {
                     ListSessions(audioService);
@@ -44,7 +47,7 @@ namespace SoundShell.PoC
             }
             catch (Exception ex)
             {
-                Console.WriteLine("ERROR: " + ex.Message);
+                logger.LogError(ex, "Unhandled exception in PoC");
             }
         }
 

@@ -109,10 +109,10 @@ namespace SoundShell.Audio
                     var sessionManager = device.AudioSessionManager;
 
                     var sink = new AudioSessionNotificationSink(this);
-                    try
+
+                    // Try registration with retries/backoff and log results
+                    if (TryRegisterSessionNotificationWithRetry(sessionManager, sink, out var regEx))
                     {
-                        dynamic dyn = sessionManager;
-                        dyn.RegisterSessionNotification(sink);
                         comNotification = sink;
                         comRegistered = true;
 
@@ -124,9 +124,9 @@ namespace SoundShell.Audio
                             try { RegisterPerSessionEventsById(s.SessionIdentifier); } catch (Exception ex) { _logger.LogWarning(ex, "RegisterPerSessionEventsById failed for {SessionId}", s.SessionIdentifier); }
                         }
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        _logger.LogWarning(ex, "Failed to RegisterSessionNotification. Monitoring disabled.");
+                        _logger.LogWarning(regEx, "RegisterSessionNotification ultimately failed after retries.");
                         comNotification = null;
                         comRegistered = false;
                     }
@@ -138,6 +138,30 @@ namespace SoundShell.Audio
                     comRegistered = false;
                 }
             }
+        }
+
+        private bool TryRegisterSessionNotificationWithRetry(object sessionManager, IAudioSessionNotification sink, out Exception lastException)
+        {
+            lastException = null;
+            const int maxAttempts = 3;
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                try
+                {
+                    dynamic dyn = sessionManager;
+                    dyn.RegisterSessionNotification(sink);
+                    _logger.LogInformation("Registered session notification on attempt {Attempt}", attempt);
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    lastException = ex;
+                    _logger.LogWarning(ex, "Attempt {Attempt} to RegisterSessionNotification failed", attempt);
+                    System.Threading.Thread.Sleep(200 * attempt);
+                }
+            }
+
+            return false;
         }
 
         public void StopMonitoring()
@@ -323,13 +347,23 @@ namespace SoundShell.Audio
                 var native = GetNativeSessionControl(sessionControl);
                 if (native != null)
                 {
-                    try
+                    // try with small retry/backoff
+                    const int maxAttempts = 3;
+                    for (int attempt = 1; attempt <= maxAttempts; attempt++)
                     {
-                        native.RegisterAudioSessionNotification(sink);
-                        perSessionSinks[sessionIdentifier] = new RegisteredSession { Events = sink, NativeControl = native };
-                        return;
+                        try
+                        {
+                            native.RegisterAudioSessionNotification(sink);
+                            perSessionSinks[sessionIdentifier] = new RegisteredSession { Events = sink, NativeControl = native };
+                            _logger.LogInformation("Registered per-session audio events for {SessionId} on attempt {Attempt}", sessionIdentifier, attempt);
+                            return;
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Attempt {Attempt} to register per-session events failed for {SessionId}", attempt, sessionIdentifier);
+                            System.Threading.Thread.Sleep(100 * attempt);
+                        }
                     }
-                    catch { }
                 }
             }
             catch { }
@@ -428,6 +462,7 @@ namespace SoundShell.Audio
             {
                 try
                 {
+                    parent._logger.LogInformation("OnSessionCreated called");
                     var comObj = Marshal.GetObjectForIUnknown(newSession);
                     if (comObj is AudioSessionControl sessionControl)
                     {
@@ -484,6 +519,7 @@ namespace SoundShell.Audio
             {
                 try
                 {
+                    parent._logger.LogInformation("OnSimpleVolumeChanged for {SessionId}: Volume={Volume:P0} Muted={Muted}", sessionId, NewVolume, NewMute);
                     var updated = parent.GetAudioSessions().FirstOrDefault(s => string.Equals(s.SessionIdentifier, sessionId, StringComparison.OrdinalIgnoreCase));
                     if (updated != null)
                     {

@@ -259,8 +259,10 @@ namespace SoundShell.Audio
                 using var process = Process.GetProcessById(processId);
                 return string.IsNullOrWhiteSpace(process.ProcessName) ? processId.ToString() : process.ProcessName;
             }
-            catch
+            catch (Exception ex)
             {
+                // Don't throw from this helper; return numeric id if process name can't be resolved.
+                try { Trace.WriteLine($"GetProcessName failed for PID {processId}: {ex.Message}"); } catch (Exception) { }
                 return processId.ToString();
             }
         }
@@ -305,7 +307,11 @@ namespace SoundShell.Audio
                     Marshal.Release(ppv);
                 }
             }
-            catch { return null; }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "GetNativeSessionControl failed for session control");
+                return null;
+            }
             finally
             {
                 if (pUnk != IntPtr.Zero)
@@ -366,18 +372,24 @@ namespace SoundShell.Audio
                     }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "RegisterPerSessionEvents dynamic fallback failed");
+            }
 
             // Fallback: try common registration method names via dynamic
             try
             {
                 dynamic dyn = sessionControl;
-                try { dyn.RegisterEventCallback(sink); } catch { }
-                try { dyn.RegisterAudioSessionNotification(sink); } catch { }
-                try { dyn.RegisterSessionNotification(sink); } catch { }
-                try { dyn.RegisterAudioSessionEvents(sink); } catch { }
+                try { dyn.RegisterEventCallback(sink); } catch (Exception ex) { _logger.LogDebug(ex, "dyn.RegisterEventCallback failed"); }
+                try { dyn.RegisterAudioSessionNotification(sink); } catch (Exception ex) { _logger.LogDebug(ex, "dyn.RegisterAudioSessionNotification failed"); }
+                try { dyn.RegisterSessionNotification(sink); } catch (Exception ex) { _logger.LogDebug(ex, "dyn.RegisterSessionNotification failed"); }
+                try { dyn.RegisterAudioSessionEvents(sink); } catch (Exception ex) { _logger.LogDebug(ex, "dyn.RegisterAudioSessionEvents failed"); }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Dynamic per-session registration methods failed for {SessionId}", sessionIdentifier);
+            }
 
             perSessionSinks[sessionIdentifier] = new RegisteredSession { Events = sink, NativeControl = null };
         }
@@ -405,12 +417,15 @@ namespace SoundShell.Audio
                         // Release underlying COM reference for native control
                         Marshal.ReleaseComObject(registered.NativeControl);
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "ReleaseComObject(native) failed for {SessionId}", sessionIdentifier);
+                    }
                 }
 
                 if (registered.Events != null)
                 {
-                    try { Marshal.ReleaseComObject(registered.Events); } catch { }
+                    try { Marshal.ReleaseComObject(registered.Events); } catch (Exception ex) { _logger.LogDebug(ex, "ReleaseComObject(events) failed for {SessionId}", sessionIdentifier); }
                 }
             }
             catch (Exception ex)
@@ -479,7 +494,10 @@ namespace SoundShell.Audio
                         parent.SessionChanged?.Invoke(parent, new AudioSessionChangedEventArgs { Session = info, ChangeType = AudioSessionChangeType.Created });
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    parent._logger.LogWarning(ex, "OnSessionCreated handler failed");
+                }
 
                 return 0; // S_OK
             }
@@ -530,7 +548,10 @@ namespace SoundShell.Audio
                         parent.SessionChanged?.Invoke(parent, new AudioSessionChangedEventArgs { Session = updated, ChangeType = change });
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    parent._logger.LogWarning(ex, "OnSimpleVolumeChanged processing failed for {SessionId}", sessionId);
+                }
             }
 
             public void OnChannelVolumeChanged(uint ChannelCount, IntPtr NewChannelVolumeArray, uint ChangedChannel, ref Guid EventContext) { }

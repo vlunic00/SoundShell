@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Globalization;
+using System.IO;
+using Serilog;
 using SoundShell.Audio;
 using Microsoft.Extensions.Logging;
 
@@ -9,7 +11,17 @@ namespace SoundShell.PoC
     {
         static void Main(string[] args)
         {
-            using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Information));
+            // Ensure logs directory
+            Directory.CreateDirectory(Path.Combine(AppContext.BaseDirectory, "logs"));
+
+            Log.Logger = new LoggerConfiguration()
+                .MinimumLevel.Information()
+                .Enrich.FromLogContext()
+                .WriteTo.Console()
+                .WriteTo.File(Path.Combine(AppContext.BaseDirectory, "logs", "soundshell-.log"), rollingInterval: RollingInterval.Day)
+                .CreateLogger();
+
+            using var loggerFactory = LoggerFactory.Create(builder => builder.AddSerilog().SetMinimumLevel(LogLevel.Information));
             var logger = loggerFactory.CreateLogger<WindowsAudioSessionService>();
             try
             {
@@ -48,6 +60,10 @@ namespace SoundShell.PoC
             catch (Exception ex)
             {
                 logger.LogError(ex, "Unhandled exception in PoC");
+            }
+            finally
+            {
+                Log.CloseAndFlush();
             }
         }
 

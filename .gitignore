@@ -20,3 +20,6 @@ packages/
 
 # Markdown files
 architecture.md
+
+# Scripts snapshots
+.scripts/*.json

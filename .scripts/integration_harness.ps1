@@ -13,7 +13,7 @@ foreach ($line in $lines) {
         $snap += [pscustomobject]@{Index=$matches[1]; Volume=$matches[2]}
     }
 }
-$snapshotPath = Join-Path $PSScriptRoot 'snapshot.json'
+$snapshotPath = Join-Path $env:TEMP ("soundshell_integration_snapshot_{0}.json" -f ([DateTime]::UtcNow.ToString("yyyyMMddHHmmss")))
 $snap | ConvertTo-Json | Out-File $snapshotPath -Encoding utf8
 Write-Output "Snapshot saved to $snapshotPath"
 
@@ -55,4 +55,8 @@ foreach ($item in $snap2) {
 
 Write-Output "Stopping watch"
 Stop-Process -Id $proc.Id -Force
+
+# cleanup snapshot
+try { Remove-Item -Path $snapshotPath -ErrorAction SilentlyContinue } catch { }
+
 Write-Output 'INTEGRATION_DONE'

@@ -293,7 +293,7 @@ namespace SoundShell.Audio
             {
                 pUnk = Marshal.GetIUnknownForObject(sessionControl);
                 var iid = new Guid("F4B1A599-7266-4319-A8CA-E70ACB11E8CD"); // IAudioSessionControl
-                var hr = Marshal.QueryInterface(pUnk, ref iid, out var ppv);
+                var hr = Marshal.QueryInterface(pUnk, in iid, out var ppv);
                 if (hr != 0 || ppv == IntPtr.Zero)
                     return null;
 

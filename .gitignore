@@ -22,3 +22,6 @@ packages/
 
 # Scripts snapshots
 .scripts/*.json
+
+# Diagnostics doc (kept locally, not committed)
+DIAGNOSTICS.md

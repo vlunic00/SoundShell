@@ -11,14 +11,19 @@ namespace SoundShell.PoC
     {
         static void Main(string[] args)
         {
-            // Ensure logs directory
-            Directory.CreateDirectory(Path.Combine(AppContext.BaseDirectory, "logs"));
+            // Configure logging with environment overrides
+            var logsDir = Environment.GetEnvironmentVariable("SOUNDLOG_PATH") ?? Path.Combine(AppContext.BaseDirectory, "logs");
+            Directory.CreateDirectory(logsDir);
+
+            var levelStr = Environment.GetEnvironmentVariable("SOUNDLOG_LEVEL") ?? "Information";
+            if (!Enum.TryParse<Serilog.Events.LogEventLevel>(levelStr, true, out var minLevel))
+                minLevel = Serilog.Events.LogEventLevel.Information;
 
             Log.Logger = new LoggerConfiguration()
-                .MinimumLevel.Information()
+                .MinimumLevel.Is(minLevel)
                 .Enrich.FromLogContext()
                 .WriteTo.Console()
-                .WriteTo.File(Path.Combine(AppContext.BaseDirectory, "logs", "soundshell-.log"), rollingInterval: RollingInterval.Day)
+                .WriteTo.File(Path.Combine(logsDir, "soundshell-.log"), rollingInterval: RollingInterval.Day)
                 .CreateLogger();
 
             using var loggerFactory = LoggerFactory.Create(builder => builder.AddSerilog().SetMinimumLevel(LogLevel.Information));

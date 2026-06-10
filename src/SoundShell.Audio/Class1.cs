@@ -53,6 +53,7 @@ namespace SoundShell.Audio
     {
         private readonly ILogger<WindowsAudioSessionService> _logger;
         private readonly MonitoringOptions _options;
+        private readonly string _serviceInstanceId = Guid.NewGuid().ToString();
 
         public WindowsAudioSessionService() : this(NullLogger<WindowsAudioSessionService>.Instance, MonitoringOptions.Default) { }
 
@@ -502,15 +503,20 @@ namespace SoundShell.Audio
                     {
                         var info = CreateSessionInfo(sessionControl);
                         parent.knownSessions[info.SessionIdentifier] = info;
-                            try
-                            {
-                                parent.RegisterPerSessionEvents(sessionControl, info.SessionIdentifier);
-                            }
-                            catch (Exception ex)
-                            {
-                                parent._logger.LogWarning(ex, "Failed to register per-session sink for {SessionId}", info.SessionIdentifier);
-                            }
-                        parent.SessionChanged?.Invoke(parent, new AudioSessionChangedEventArgs { Session = info, ChangeType = AudioSessionChangeType.Created });
+                        try
+                        {
+                            parent.RegisterPerSessionEvents(sessionControl, info.SessionIdentifier);
+                        }
+                        catch (Exception ex)
+                        {
+                            parent._logger.LogWarning(ex, "Failed to register per-session sink for {SessionId}", info.SessionIdentifier);
+                        }
+
+                        // add structured scope for this event
+                        using (parent._logger.BeginScope(new System.Collections.Generic.Dictionary<string, object> { ["SessionId"] = info.SessionIdentifier, ["ServiceInstanceId"] = parent._serviceInstanceId }))
+                        {
+                            parent.SessionChanged?.Invoke(parent, new AudioSessionChangedEventArgs { Session = info, ChangeType = AudioSessionChangeType.Created });
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -564,7 +570,10 @@ namespace SoundShell.Audio
                         if (updated.IsMuted != NewMute)
                             change = AudioSessionChangeType.MutedChanged;
                         parent.knownSessions[sessionId] = updated;
-                        parent.SessionChanged?.Invoke(parent, new AudioSessionChangedEventArgs { Session = updated, ChangeType = change });
+                        using (parent._logger.BeginScope(new System.Collections.Generic.Dictionary<string, object> { ["SessionId"] = sessionId, ["ServiceInstanceId"] = parent._serviceInstanceId }))
+                        {
+                            parent.SessionChanged?.Invoke(parent, new AudioSessionChangedEventArgs { Session = updated, ChangeType = change });
+                        }
                     }
                 }
                 catch (Exception ex)

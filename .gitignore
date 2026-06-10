@@ -19,7 +19,6 @@ packages/
 *.log
 
 # Markdown files
-architecture.md
 
 # Scripts snapshots
 .scripts/*.json

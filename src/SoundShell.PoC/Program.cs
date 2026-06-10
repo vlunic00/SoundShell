@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Globalization;
 using System.IO;
+using Microsoft.Extensions.Configuration;
 using Serilog;
 using SoundShell.Audio;
 using Microsoft.Extensions.Logging;
@@ -11,26 +12,27 @@ namespace SoundShell.PoC
     {
         static void Main(string[] args)
         {
-            // Configure logging with environment overrides
-            var logsDir = Environment.GetEnvironmentVariable("SOUNDLOG_PATH") ?? Path.Combine(AppContext.BaseDirectory, "logs");
-            Directory.CreateDirectory(logsDir);
+            // Load configuration (appsettings.json + environment overrides)
+            var config = new ConfigurationBuilder()
+                .SetBasePath(AppContext.BaseDirectory)
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                .AddJsonFile($"appsettings.{Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production"}.json", optional: true, reloadOnChange: true)
+                .AddEnvironmentVariables()
+                .Build();
 
-            var levelStr = Environment.GetEnvironmentVariable("SOUNDLOG_LEVEL") ?? "Information";
-            if (!Enum.TryParse<Serilog.Events.LogEventLevel>(levelStr, true, out var minLevel))
-                minLevel = Serilog.Events.LogEventLevel.Information;
-
+            // Configure Serilog from configuration (Serilog section) with fallback
             Log.Logger = new LoggerConfiguration()
-                .MinimumLevel.Is(minLevel)
+                .ReadFrom.Configuration(config)
                 .Enrich.FromLogContext()
-                .WriteTo.Console()
-                .WriteTo.File(Path.Combine(logsDir, "soundshell-.log"), rollingInterval: RollingInterval.Day)
                 .CreateLogger();
 
-            using var loggerFactory = LoggerFactory.Create(builder => builder.AddSerilog().SetMinimumLevel(LogLevel.Information));
+            using var loggerFactory = LoggerFactory.Create(builder => builder.AddSerilog());
             var logger = loggerFactory.CreateLogger<WindowsAudioSessionService>();
             try
             {
-                using var audioService = new WindowsAudioSessionService(logger);
+                // Bind monitoring options and pass into service
+                var monitoringOptions = config.GetSection("Monitoring").Get<WindowsAudioSessionService.MonitoringOptions>() ?? WindowsAudioSessionService.MonitoringOptions.Default;
+                using var audioService = new WindowsAudioSessionService(logger, monitoringOptions);
                 if (args.Length == 0)
                 {
                     ListSessions(audioService);

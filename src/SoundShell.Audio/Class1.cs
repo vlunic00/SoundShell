@@ -52,12 +52,26 @@ namespace SoundShell.Audio
     public sealed class WindowsAudioSessionService : IAudioSessionService
     {
         private readonly ILogger<WindowsAudioSessionService> _logger;
+        private readonly MonitoringOptions _options;
 
-        public WindowsAudioSessionService() : this(NullLogger<WindowsAudioSessionService>.Instance) { }
+        public WindowsAudioSessionService() : this(NullLogger<WindowsAudioSessionService>.Instance, MonitoringOptions.Default) { }
 
-        public WindowsAudioSessionService(ILogger<WindowsAudioSessionService> logger)
+        public WindowsAudioSessionService(ILogger<WindowsAudioSessionService> logger) : this(logger, MonitoringOptions.Default) { }
+
+        public WindowsAudioSessionService(ILogger<WindowsAudioSessionService> logger, MonitoringOptions options)
         {
             _logger = logger ?? NullLogger<WindowsAudioSessionService>.Instance;
+            _options = options ?? MonitoringOptions.Default;
+        }
+
+        public sealed class MonitoringOptions
+        {
+            public static MonitoringOptions Default { get; } = new MonitoringOptions();
+
+            public int SessionRegistrationMaxAttempts { get; set; } = 3;
+            public int SessionRegistrationBackoffMs { get; set; } = 200;
+            public int PerSessionRegistrationMaxAttempts { get; set; } = 3;
+            public int PerSessionRegistrationBackoffMs { get; set; } = 100;
         }
 
         private readonly MMDeviceEnumerator deviceEnumerator = new MMDeviceEnumerator();
@@ -143,7 +157,9 @@ namespace SoundShell.Audio
         private bool TryRegisterSessionNotificationWithRetry(object sessionManager, IAudioSessionNotification sink, out Exception lastException)
         {
             lastException = null;
-            const int maxAttempts = 3;
+            var maxAttempts = _options?.SessionRegistrationMaxAttempts ?? 3;
+            var backoffMs = _options?.SessionRegistrationBackoffMs ?? 200;
+
             for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
                 try
@@ -157,10 +173,11 @@ namespace SoundShell.Audio
                 {
                     lastException = ex;
                     _logger.LogWarning(ex, "Attempt {Attempt} to RegisterSessionNotification failed", attempt);
-                    System.Threading.Thread.Sleep(200 * attempt);
+                    try { System.Threading.Thread.Sleep(backoffMs * attempt); } catch { }
                 }
             }
 
+            _logger.LogError(lastException, "Failed to register session notification after {Attempts} attempts", maxAttempts);
             return false;
         }
 
@@ -353,8 +370,9 @@ namespace SoundShell.Audio
                 var native = GetNativeSessionControl(sessionControl);
                 if (native != null)
                 {
-                    // try with small retry/backoff
-                    const int maxAttempts = 3;
+                    // try with small retry/backoff (configurable)
+                    var maxAttempts = _options?.PerSessionRegistrationMaxAttempts ?? 3;
+                    var backoffMs = _options?.PerSessionRegistrationBackoffMs ?? 100;
                     for (int attempt = 1; attempt <= maxAttempts; attempt++)
                     {
                         try
@@ -367,9 +385,10 @@ namespace SoundShell.Audio
                         catch (Exception ex)
                         {
                             _logger.LogWarning(ex, "Attempt {Attempt} to register per-session events failed for {SessionId}", attempt, sessionIdentifier);
-                            System.Threading.Thread.Sleep(100 * attempt);
+                            try { System.Threading.Thread.Sleep(backoffMs * attempt); } catch { }
                         }
                     }
+                    _logger.LogError("Failed to register per-session audio events for {SessionId} after {Attempts} attempts", sessionIdentifier, maxAttempts);
                 }
             }
             catch (Exception ex)

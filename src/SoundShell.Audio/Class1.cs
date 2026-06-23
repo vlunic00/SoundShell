@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using NAudio.CoreAudioApi;
 using System.Runtime.InteropServices;
+using System.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -49,7 +50,7 @@ namespace SoundShell.Audio
         AudioSessionInfo FindSessionByProcessName(string processName);
     }
 
-    public sealed class WindowsAudioSessionService : IAudioSessionService
+    public class WindowsAudioSessionService : IAudioSessionService
     {
         private readonly ILogger<WindowsAudioSessionService> _logger;
         private readonly MonitoringOptions _options;
@@ -69,10 +70,13 @@ namespace SoundShell.Audio
         {
             public static MonitoringOptions Default { get; } = new MonitoringOptions();
 
-            public int SessionRegistrationMaxAttempts { get; set; } = 3;
+            public int SessionRegistrationMaxAttempts { get; set; } = 5;
             public int SessionRegistrationBackoffMs { get; set; } = 200;
             public int PerSessionRegistrationMaxAttempts { get; set; } = 3;
             public int PerSessionRegistrationBackoffMs { get; set; } = 100;
+            // Polling fallback (PoC compatibility)
+            public bool EnablePollingFallback { get; set; } = true;
+            public int PollingIntervalMs { get; set; } = 800;
         }
 
         private readonly MMDeviceEnumerator deviceEnumerator = new MMDeviceEnumerator();
@@ -81,6 +85,8 @@ namespace SoundShell.Audio
         private object comNotification;
         private bool comRegistered;
         private readonly System.Collections.Concurrent.ConcurrentDictionary<string, RegisteredSession> perSessionSinks = new System.Collections.Concurrent.ConcurrentDictionary<string, RegisteredSession>(StringComparer.OrdinalIgnoreCase);
+        private Timer pollingTimer;
+        private int pollingInProgress;
 
         private sealed class RegisteredSession
         {
@@ -89,6 +95,12 @@ namespace SoundShell.Audio
         }
 
         public IReadOnlyList<AudioSessionInfo> GetAudioSessions()
+        {
+            return FetchAudioSessions();
+        }
+
+        // Separated out for testability: subclasses (tests) can override this to provide deterministic session sets.
+        protected virtual IReadOnlyList<AudioSessionInfo> FetchAudioSessions()
         {
             var sessions = new List<AudioSessionInfo>();
             using var device = deviceEnumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
@@ -138,6 +150,7 @@ namespace SoundShell.Audio
                             knownSessions[s.SessionIdentifier] = s;
                             try { RegisterPerSessionEventsById(s.SessionIdentifier); } catch (Exception ex) { _logger.LogWarning(ex, "RegisterPerSessionEventsById failed for {SessionId}", s.SessionIdentifier); }
                         }
+                        // If polling fallback explicitly enabled, still avoid polling when COM notifications are successfully registered.
                     }
                     else
                     {
@@ -152,6 +165,12 @@ namespace SoundShell.Audio
                     comNotification = null;
                     comRegistered = false;
                 }
+                // If COM-based registration wasn't available and fallback is enabled, start polling
+                if (!comRegistered && (_options?.EnablePollingFallback ?? false))
+                {
+                    _logger.LogInformation("Starting polling fallback for audio session monitoring (interval {Ms}ms)", _options.PollingIntervalMs);
+                    StartPolling();
+                }
             }
         }
 
@@ -165,8 +184,21 @@ namespace SoundShell.Audio
             {
                 try
                 {
-                    dynamic dyn = sessionManager;
-                    dyn.RegisterSessionNotification(sink);
+                    try { Console.WriteLine($"TryRegisterSessionNotificationWithRetry attempt {attempt}"); } catch {}
+                    // Prefer reflection invocation to avoid dynamic binder/runtime issues in test hosts.
+                    var mi = sessionManager?.GetType().GetMethod("RegisterSessionNotification");
+                    if (mi != null)
+                    {
+                        mi.Invoke(sessionManager, new object[] { sink });
+                        try { Console.WriteLine($"TryRegisterSessionNotificationWithRetry reflection invoke succeeded on attempt {attempt}"); } catch {}
+                    }
+                    else
+                    {
+                        dynamic dyn = sessionManager;
+                        dyn.RegisterSessionNotification(sink);
+                        try { Console.WriteLine($"TryRegisterSessionNotificationWithRetry dynamic invoke succeeded on attempt {attempt}"); } catch {}
+                    }
+
                     _logger.LogInformation("Registered session notification on attempt {Attempt}", attempt);
                     return true;
                 }
@@ -186,6 +218,8 @@ namespace SoundShell.Audio
         {
             lock (monitorLock)
             {
+                // Stop polling if active
+                StopPolling();
                 // If COM registration was used, attempt to unregister
                 if (comRegistered && comNotification != null)
                 {
@@ -220,6 +254,120 @@ namespace SoundShell.Audio
 
                 knownSessions.Clear();
             }
+        }
+
+        private void StartPolling()
+        {
+            if (pollingTimer != null)
+                return;
+
+            var interval = (_options?.PollingIntervalMs > 0) ? _options.PollingIntervalMs : 800;
+            pollingTimer = new Timer(_ => PollSessions(), null, 0, interval);
+        }
+
+        private void StopPolling()
+        {
+            try
+            {
+                var t = Interlocked.Exchange(ref pollingTimer, null);
+                if (t != null)
+                {
+                    t.Change(Timeout.Infinite, Timeout.Infinite);
+                    t.Dispose();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "StopPolling failed");
+            }
+            finally
+            {
+                Interlocked.Exchange(ref pollingInProgress, 0);
+            }
+        }
+
+        private void PollSessions()
+        {
+            // Prevent reentrancy
+            if (Interlocked.Exchange(ref pollingInProgress, 1) == 1)
+                return;
+
+            try
+            {
+                var current = GetAudioSessions();
+                var currentById = current.ToDictionary(s => s.SessionIdentifier, StringComparer.OrdinalIgnoreCase);
+
+                // Detect created sessions
+                foreach (var kv in currentById)
+                {
+                    if (!knownSessions.ContainsKey(kv.Key))
+                    {
+                        knownSessions[kv.Key] = kv.Value;
+                        try
+                        {
+                            RegisterPerSessionEventsById(kv.Key);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogDebug(ex, "RegisterPerSessionEventsById failed during polling for {SessionId}", kv.Key);
+                        }
+
+                        using (_logger.BeginScope(new System.Collections.Generic.Dictionary<string, object> { ["SessionId"] = kv.Key, ["ServiceInstanceId"] = _serviceInstanceId }))
+                        {
+                            SessionChanged?.Invoke(this, new AudioSessionChangedEventArgs { Session = kv.Value, ChangeType = AudioSessionChangeType.Created });
+                        }
+                    }
+                }
+
+                // Detect removed sessions
+                foreach (var knownKey in knownSessions.Keys.ToList())
+                {
+                    if (!currentById.ContainsKey(knownKey))
+                    {
+                        if (knownSessions.TryRemove(knownKey, out var removed))
+                        {
+                            try { UnregisterPerSessionEventsById(knownKey); } catch (Exception ex) { _logger.LogDebug(ex, "UnregisterPerSessionEventsById failed during polling for {SessionId}", knownKey); }
+                            using (_logger.BeginScope(new System.Collections.Generic.Dictionary<string, object> { ["SessionId"] = knownKey, ["ServiceInstanceId"] = _serviceInstanceId }))
+                            {
+                                SessionChanged?.Invoke(this, new AudioSessionChangedEventArgs { Session = removed, ChangeType = AudioSessionChangeType.Removed });
+                            }
+                        }
+                    }
+                }
+
+                // Detect volume/mute changes
+                foreach (var kv in currentById)
+                {
+                    if (knownSessions.TryGetValue(kv.Key, out var known))
+                    {
+                        if (Math.Abs(known.Volume - kv.Value.Volume) > 0.0001f || known.IsMuted != kv.Value.IsMuted)
+                        {
+                            knownSessions[kv.Key] = kv.Value;
+                            var change = AudioSessionChangeType.VolumeChanged;
+                            if (known.IsMuted != kv.Value.IsMuted)
+                                change = AudioSessionChangeType.MutedChanged;
+                            using (_logger.BeginScope(new System.Collections.Generic.Dictionary<string, object> { ["SessionId"] = kv.Key, ["ServiceInstanceId"] = _serviceInstanceId }))
+                            {
+                                SessionChanged?.Invoke(this, new AudioSessionChangedEventArgs { Session = kv.Value, ChangeType = change });
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Polling loop failed");
+            }
+            finally
+            {
+                Interlocked.Exchange(ref pollingInProgress, 0);
+            }
+        }
+
+        // Internal test hook to invoke the polling logic synchronously from unit tests.
+        internal void PollSessionsInternal()
+        {
+            PollSessions();
         }
 
         public AudioSessionInfo FindSessionByProcessName(string processName)

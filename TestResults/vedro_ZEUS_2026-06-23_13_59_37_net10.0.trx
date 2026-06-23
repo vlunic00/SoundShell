@@ -1,0 +1,71 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="c2102212-34ef-497e-b03b-cae086f65ad0" name="vedro@ZEUS 2026-06-23 13:59:37" runUser="ZEUS\vedro" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-06-23T13:59:37.1438739+02:00" queuing="2026-06-23T13:59:37.1438740+02:00" start="2026-06-23T13:59:35.3642790+02:00" finish="2026-06-23T13:59:38.9197790+02:00" />
+  <TestSettings name="default" id="2c242406-6c8c-46a8-a76c-c216d27138c8">
+    <Deployment runDeploymentRoot="vedro_ZEUS_2026-06-23_13_59_37" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="cef5cbb1-b606-4b59-94bf-9607a25ec15b" testId="601b068e-da39-5cd2-699c-e4f11ba62cc0" testName="SoundShell.Unit.AudioServiceTests.SessionChanged_EventRaised_HandlerReceivesEvent" computerName="ZEUS" duration="00:00:00.0348376" startTime="2026-06-23T13:59:35.8494911+02:00" endTime="2026-06-23T13:59:35.8494911+02:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="cef5cbb1-b606-4b59-94bf-9607a25ec15b" />
+    <UnitTestResult executionId="d3d5bee8-6313-4c9e-bd03-6cc8e196c731" testId="82a3308d-a6c0-f8ad-d0ab-87ec504188d8" testName="SoundShell.Unit.PollingTests.Polling_Detects_Created_And_Volume_Changed" computerName="ZEUS" duration="00:00:00.0254062" startTime="2026-06-23T13:59:35.8229563+02:00" endTime="2026-06-23T13:59:35.8229563+02:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d3d5bee8-6313-4c9e-bd03-6cc8e196c731" />
+    <UnitTestResult executionId="f3214e79-b02b-46ff-8122-f3ffafc46b10" testId="917d2d1a-da2e-8404-3336-33e4999126ab" testName="SoundShell.Unit.WindowsAudioSessionServiceTests.TryRegisterSessionNotificationWithRetry_SucceedsAfterTransientFailures" computerName="ZEUS" duration="00:00:03.0747446" startTime="2026-06-23T13:59:38.8820412+02:00" endTime="2026-06-23T13:59:38.8820414+02:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f3214e79-b02b-46ff-8122-f3ffafc46b10">
+      <Output>
+        <ErrorInfo>
+          <Message>Expected registration to eventually succeed</Message>
+          <StackTrace>   at SoundShell.Unit.WindowsAudioSessionServiceTests.TryRegisterSessionNotificationWithRetry_SucceedsAfterTransientFailures() in C:\Users\vedro\Documents\Development\SoundShell\tests\SoundShell.Unit\WindowsAudioSessionServiceTests.cs:line 40&#xD;
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="953fb0f8-6b54-44ca-a209-aec0f3f3b941" testId="12526dd9-7475-a975-9e78-9f573078eb80" testName="SoundShell.Unit.AudioServiceTests.ResolveSessionIdentifier_ByIndex_ReturnsCorrectIdentifier" computerName="ZEUS" duration="00:00:00.0149988" startTime="2026-06-23T13:59:35.8150802+02:00" endTime="2026-06-23T13:59:35.8151079+02:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="953fb0f8-6b54-44ca-a209-aec0f3f3b941" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="SoundShell.Unit.WindowsAudioSessionServiceTests.TryRegisterSessionNotificationWithRetry_SucceedsAfterTransientFailures" storage="c:\users\vedro\documents\development\soundshell\tests\soundshell.unit\bin\debug\net10.0-windows\soundshell.unit.dll" id="917d2d1a-da2e-8404-3336-33e4999126ab">
+      <Execution id="f3214e79-b02b-46ff-8122-f3ffafc46b10" />
+      <TestMethod codeBase="C:\Users\vedro\Documents\Development\SoundShell\tests\SoundShell.Unit\bin\Debug\net10.0-windows\SoundShell.Unit.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="SoundShell.Unit.WindowsAudioSessionServiceTests" name="TryRegisterSessionNotificationWithRetry_SucceedsAfterTransientFailures" />
+    </UnitTest>
+    <UnitTest name="SoundShell.Unit.AudioServiceTests.ResolveSessionIdentifier_ByIndex_ReturnsCorrectIdentifier" storage="c:\users\vedro\documents\development\soundshell\tests\soundshell.unit\bin\debug\net10.0-windows\soundshell.unit.dll" id="12526dd9-7475-a975-9e78-9f573078eb80">
+      <Execution id="953fb0f8-6b54-44ca-a209-aec0f3f3b941" />
+      <TestMethod codeBase="C:\Users\vedro\Documents\Development\SoundShell\tests\SoundShell.Unit\bin\Debug\net10.0-windows\SoundShell.Unit.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="SoundShell.Unit.AudioServiceTests" name="ResolveSessionIdentifier_ByIndex_ReturnsCorrectIdentifier" />
+    </UnitTest>
+    <UnitTest name="SoundShell.Unit.AudioServiceTests.SessionChanged_EventRaised_HandlerReceivesEvent" storage="c:\users\vedro\documents\development\soundshell\tests\soundshell.unit\bin\debug\net10.0-windows\soundshell.unit.dll" id="601b068e-da39-5cd2-699c-e4f11ba62cc0">
+      <Execution id="cef5cbb1-b606-4b59-94bf-9607a25ec15b" />
+      <TestMethod codeBase="C:\Users\vedro\Documents\Development\SoundShell\tests\SoundShell.Unit\bin\Debug\net10.0-windows\SoundShell.Unit.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="SoundShell.Unit.AudioServiceTests" name="SessionChanged_EventRaised_HandlerReceivesEvent" />
+    </UnitTest>
+    <UnitTest name="SoundShell.Unit.PollingTests.Polling_Detects_Created_And_Volume_Changed" storage="c:\users\vedro\documents\development\soundshell\tests\soundshell.unit\bin\debug\net10.0-windows\soundshell.unit.dll" id="82a3308d-a6c0-f8ad-d0ab-87ec504188d8">
+      <Execution id="d3d5bee8-6313-4c9e-bd03-6cc8e196c731" />
+      <TestMethod codeBase="C:\Users\vedro\Documents\Development\SoundShell\tests\SoundShell.Unit\bin\Debug\net10.0-windows\SoundShell.Unit.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="SoundShell.Unit.PollingTests" name="Polling_Detects_Created_And_Volume_Changed" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="601b068e-da39-5cd2-699c-e4f11ba62cc0" executionId="cef5cbb1-b606-4b59-94bf-9607a25ec15b" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="82a3308d-a6c0-f8ad-d0ab-87ec504188d8" executionId="d3d5bee8-6313-4c9e-bd03-6cc8e196c731" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="917d2d1a-da2e-8404-3336-33e4999126ab" executionId="f3214e79-b02b-46ff-8122-f3ffafc46b10" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="12526dd9-7475-a975-9e78-9f573078eb80" executionId="953fb0f8-6b54-44ca-a209-aec0f3f3b941" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="4" executed="4" passed="3" failed="1" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.8.0+6438bb880a (64-bit .NET 10.0.8)&#xD;
+[xUnit.net 00:00:00.10]   Discovering: SoundShell.Unit&#xD;
+[xUnit.net 00:00:00.13]   Discovered:  SoundShell.Unit&#xD;
+[xUnit.net 00:00:00.13]   Starting:    SoundShell.Unit&#xD;
+[xUnit.net 00:00:03.24]       Expected registration to eventually succeed&#xD;
+[xUnit.net 00:00:03.24]       Stack Trace:&#xD;
+[xUnit.net 00:00:03.24]         C:\Users\vedro\Documents\Development\SoundShell\tests\SoundShell.Unit\WindowsAudioSessionServiceTests.cs(40,0): at SoundShell.Unit.WindowsAudioSessionServiceTests.TryRegisterSessionNotificationWithRetry_SucceedsAfterTransientFailures()&#xD;
+[xUnit.net 00:00:03.24]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)&#xD;
+[xUnit.net 00:00:03.24]            at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)&#xD;
+[xUnit.net 00:00:03.25]   Finished:    SoundShell.Unit&#xD;
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="ZEUS" outcome="Error" timestamp="2026-06-23T13:59:38.8804197+02:00">
+        <Text>[xUnit.net 00:00:03.24]     SoundShell.Unit.WindowsAudioSessionServiceTests.TryRegisterSessionNotificationWithRetry_SucceedsAfterTransientFailures [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

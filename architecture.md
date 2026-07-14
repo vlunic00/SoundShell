@@ -1,36 +1,48 @@
-# Project Specification: Windows Per-App Volume Mixer
+# SoundShell Architecture
 
 ## Objective
-Build a native Windows utility that allows independent volume control for individual open windows/applications (e.g., lowering game volume while keeping YouTube loud).
 
-## Tech Stack
-- **Target OS:** Windows 10/11
-- **Runtime:** .NET 8+ (Console PoC leading to WinUI 3 desktop application)
-- **Language:** C#
-- **Core Library:** NAudio (specifically wrapping WASAPI `IAudioSessionManager2` and `AudioSessionControl`)
-- **Architecture Pattern:** MVVM (Model-View-ViewModel)
+SoundShell is a native Windows 10/11 per-application volume mixer. It groups active render sessions by executable name so one slider and mute control manage every session belonging to an application.
 
-## Implementation Phases
-1. **Phase 1 (Spike):** Create a .NET Console App to find a specific process (like 'chrome') and adjust its `SimpleAudioVolume` using NAudio.
-2. **Phase 2 (Service):** Implement `WindowsAudioService` utilizing `IAudioSessionNotification` to react to OS audio session events without aggressive polling.
+## Stack
 
-Implementation note (current): a lightweight event model was added to the audio library exposing session lifecycle and property-change events. To ensure broad compatibility while a COM-based notification wrapper is prepared, the current PoC implementation uses a short-interval (800ms) polling loop as a pragmatic fallback that raises events for session Created/Removed/VolumeChanged/MutedChanged. This is intentionally designed to be replaceable by a proper `IAudioSessionNotification` registration once a stable wrapper is implemented.
-3. **Phase 3 (UI):** Build a WinUI 3 interface displaying process names, extracted icons, and volume sliders data-bound to the audio service.
-4. **Phase 4 (System):** Minimize to System Tray and configure the app package with `runFullTrust` capability to bypass UWP sandboxing.
+- .NET 10 and C#
+- NAudio/WASAPI for Windows audio sessions
+- WinUI 3 and Windows App SDK 1.8.6
+- MVVM using `INotifyPropertyChanged` and `ObservableCollection`
+- x64 MSIX packaging
 
-## Environment Note
-This project is developed across multiple machines using VS Code and the .NET CLI. Keep dependencies strictly in Nuget and avoid absolute local file paths.
+## Completed Phases
+
+1. **Console spike:** enumerate sessions and set volume/mute from the command line.
+2. **Audio service:** use NAudio's native `OnSessionCreated` and per-session event clients for lifecycle, volume, and mute changes. An 800 ms polling loop is retained only when native monitoring cannot initialize.
+3. **Desktop mixer:** show executable icons, process-name groups, volume sliders, mute controls, empty/error states, and mixed values. Changing a mixed row synchronizes every underlying session instance.
+4. **Desktop lifecycle:** hide minimized windows to the system tray, provide Show/Exit actions, and persist a default-on Close-to-tray preference.
+
+## Components
+
+- `SoundShell.Audio` owns WASAPI enumeration, monitoring, session-instance identity, and volume/mute operations.
+- `SoundShell.PoC` remains the diagnostic command-line client.
+- `SoundShell.App` owns grouping, icon caching, WinUI presentation, tray behavior, local settings, and MSIX packaging.
+
+The service exposes individual session instances. Grouping stays in the desktop view model because it is presentation behavior rather than an audio-system primitive.
+
+## Packaging and Trust
+
+The packaged app runs as a normal medium-integrity desktop process. MSIX requires the `runFullTrust` manifest declaration for that process model; it does not request administrator elevation. This is necessary for WASAPI access, executable icon inspection, and the Win32 notification-area icon.
+
+The package is framework-dependent, targets x64, and is unsigned by default. Release or developer builds supply signing credentials externally; private keys are never stored in the repository. Logs and cached icons are written beneath the package's local application-data folders rather than the read-only install directory.
 
 ## Configuration
-Configuration is provided via `appsettings.json` with optional environment-specific overrides (e.g. `appsettings.Development.json`) and environment variables. The PoC reads configuration on startup and binds the `Monitoring` section to the service `MonitoringOptions` so runtime behavior can be adjusted without recompilation.
 
-- **Logging**: configure minimum level and path. Example keys: `Logging:MinimumLevel`, `Logging:Path`. Serilog is configured via the `Serilog` section in `appsettings.json`.
-- **Monitoring**: tuning for retry/backoff and registration behavior. Example keys: `Monitoring:SessionRegistrationMaxAttempts`, `Monitoring:SessionRegistrationBackoffMs`, `Monitoring:PerSessionRegistrationMaxAttempts`, `Monitoring:PerSessionRegistrationBackoffMs`.
-- **Features**: feature flags (e.g. `Features:EnablePollingFallback`) can be added to gate behavior for testing or compatibility.
+`Monitoring:EnablePollingFallback` enables the compatibility fallback and `Monitoring:PollingIntervalMs` sets its interval. Serilog's minimum level is read from `appsettings.json`; packaged-app logs are written to local application data.
 
-Environment variables override config values. Useful variables already supported:
-- `ASPNETCORE_ENVIRONMENT` — selects `appsettings.{ENV}.json` (e.g. `Development`).
-- `SOUNDLOG_PATH` — (legacy) overrides the log directory. Prefer editing `appsettings.json` or `Serilog` configuration.
-- `SOUNDLOG_LEVEL` — (legacy) overrides log level; prefer `Serilog:MinimumLevel` in config.
+The PoC additionally supports `ASPNETCORE_ENVIRONMENT` for environment-specific configuration overrides.
 
-For production, keep configuration in `appsettings.json` and use environment-specific overrides or CI secrets to adjust values. Consider using `reloadOnChange` for `appsettings.json` in development to allow changing log levels without restarting the process.
+## Deferred
+
+- Startup at login and automatic updates
+- Multiple output-device selection
+- Per-window mapping where Windows exposes only process/session identity
+- Saved per-application volume profiles
+- x86 and ARM64 packages

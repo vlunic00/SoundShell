@@ -1,4 +1,5 @@
-$proj = 'c:\Users\vedro\Documents\Development\SoundShell\src\SoundShell.PoC\SoundShell.PoC.csproj'
+$repoRoot = Split-Path $PSScriptRoot -Parent
+$proj = Join-Path $repoRoot 'src\SoundShell.PoC\SoundShell.PoC.csproj'
 
 Write-Output "Taking snapshot from $proj"
 $output = dotnet run --project $proj -- list

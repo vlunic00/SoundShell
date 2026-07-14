@@ -1,6 +1,6 @@
-$proj = 'c:\Users\vedro\Documents\Development\SoundShell\src\SoundShell.PoC\SoundShell.PoC.csproj'
-$logsDir = Join-Path (Join-Path (Get-Item $proj).Directory.FullName '..\..\..\bin\Debug\net10.0-windows') 'logs'
-if (-not (Test-Path $logsDir)) { $logsDir = Join-Path (Get-Location) 'src\SoundShell.PoC\bin\Debug\net10.0-windows\logs' }
+$repoRoot = Split-Path $PSScriptRoot -Parent
+$proj = Join-Path $repoRoot 'src\SoundShell.PoC\SoundShell.PoC.csproj'
+$logsDir = Join-Path $repoRoot 'src\SoundShell.PoC\bin\Debug\net10.0-windows\logs'
 
 Write-Output "Using logs directory: $logsDir"
 

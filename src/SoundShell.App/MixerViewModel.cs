@@ -96,6 +96,7 @@ public sealed class MixerViewModel : INotifyPropertyChanged, IDisposable
     private readonly Dictionary<string, AudioSessionInfo> sessions = new(StringComparer.OrdinalIgnoreCase);
     private string errorMessage;
     private bool initialized;
+    private bool disposed;
 
     public MixerViewModel(IAudioSessionService service, Action<Action> dispatch = null, Func<string, object> iconResolver = null)
     {
@@ -186,6 +187,9 @@ public sealed class MixerViewModel : INotifyPropertyChanged, IDisposable
 
     public void Dispose()
     {
+        if (disposed)
+            return;
+        disposed = true;
         service.SessionChanged -= OnSessionChanged;
         service.StopMonitoring();
         service.Dispose();

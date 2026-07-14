@@ -9,10 +9,16 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
-        <StackPanel Orientation="Horizontal" Spacing="12">
+        <Grid ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
             <FontIcon Glyph="&#xE767;" FontSize="28" />
-            <TextBlock Text="SoundShell" Style="{StaticResource TitleTextBlockStyle}" VerticalAlignment="Center" />
-        </StackPanel>
+            <TextBlock Grid.Column="1" Text="SoundShell" Style="{StaticResource TitleTextBlockStyle}" VerticalAlignment="Center" />
+            <ToggleSwitch Grid.Column="2" Header="Close to tray" IsOn="{x:Bind CloseToTray, Mode=TwoWay}" AutomationProperties.Name="Close to tray" />
+        </Grid>
         <Grid Grid.Row="1">
             <ScrollViewer>
                 <ItemsControl ItemsSource="{x:Bind ViewModel.Groups, Mode=OneWay}">

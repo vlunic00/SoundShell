@@ -13,4 +13,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\SoundShell.Audio\SoundShell.Audio.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\src\SoundShell.App\MixerViewModel.cs" Link="MixerViewModel.cs" />
+  </ItemGroup>
 </Project>

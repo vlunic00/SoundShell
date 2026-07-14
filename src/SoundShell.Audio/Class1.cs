@@ -17,6 +17,7 @@ public sealed class AudioSessionInfo
     public string SessionInstanceIdentifier { get; init; }
     public int ProcessId { get; init; }
     public string ProcessName { get; init; }
+    public string ExecutablePath { get; init; }
     public string DisplayName { get; init; }
     public float Volume { get; init; }
     public bool IsMuted { get; init; }
@@ -407,12 +408,14 @@ public class WindowsAudioSessionService : IAudioSessionService
     private static AudioSessionInfo CreateSessionInfo(AudioSessionControl session)
     {
         var processId = (int)session.GetProcessID;
+        var process = GetProcessInfo(processId);
         return new AudioSessionInfo
         {
             SessionIdentifier = session.GetSessionIdentifier ?? string.Empty,
             SessionInstanceIdentifier = session.GetSessionInstanceIdentifier ?? string.Empty,
             ProcessId = processId,
-            ProcessName = GetProcessName(processId),
+            ProcessName = process.Name,
+            ExecutablePath = process.Path,
             DisplayName = string.IsNullOrWhiteSpace(session.DisplayName)
                 ? session.GetSessionIdentifier ?? string.Empty
                 : session.DisplayName,
@@ -428,26 +431,30 @@ public class WindowsAudioSessionService : IAudioSessionService
         SessionInstanceIdentifier = session.SessionInstanceIdentifier,
         ProcessId = session.ProcessId,
         ProcessName = session.ProcessName,
+        ExecutablePath = session.ExecutablePath,
         DisplayName = session.DisplayName,
         Volume = volume,
         IsMuted = isMuted,
         IsSystemSounds = session.IsSystemSounds
     };
 
-    private static string GetProcessName(int processId)
+    private static (string Name, string Path) GetProcessInfo(int processId)
     {
         if (processId <= 0)
-            return "System Sounds";
+            return ("System Sounds", null);
 
         try
         {
             using var process = Process.GetProcessById(processId);
-            return string.IsNullOrWhiteSpace(process.ProcessName) ? processId.ToString() : process.ProcessName;
+            var name = string.IsNullOrWhiteSpace(process.ProcessName) ? processId.ToString() : process.ProcessName;
+            string path = null;
+            try { path = process.MainModule?.FileName; } catch (Exception ex) { Trace.WriteLine($"Executable path lookup failed for PID {processId}: {ex.Message}"); }
+            return (name, path);
         }
         catch (Exception ex)
         {
             Trace.WriteLine($"GetProcessName failed for PID {processId}: {ex.Message}");
-            return processId.ToString();
+            return (processId.ToString(), null);
         }
     }
 

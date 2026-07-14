@@ -89,7 +89,7 @@ namespace SoundShell.PoC
                 var session = sessions[i];
                 Console.WriteLine($"[{i + 1}] {session.ProcessName} (PID={session.ProcessId}) " +
                     $"DisplayName='{session.DisplayName}' Volume={session.Volume:P0} Muted={session.IsMuted} " +
-                    $"SessionId={session.SessionIdentifier}");
+                    $"SessionInstanceId={session.SessionInstanceIdentifier}");
             }
         }
 
@@ -134,7 +134,7 @@ namespace SoundShell.PoC
                 if (index < 1 || index > sessions.Count)
                     throw new ArgumentOutOfRangeException(nameof(sessionIdOrIndex), "Index is out of range.");
 
-                return sessions[index - 1].SessionIdentifier;
+                return sessions[index - 1].SessionInstanceIdentifier;
             }
 
             return sessionIdOrIndex;

@@ -27,23 +27,24 @@ namespace SoundShell.Unit
         }
 
         [Fact]
-        public void Polling_Detects_Created_And_Volume_Changed()
+        public void Polling_Detects_Created_Volume_And_Removed()
         {
             var sid = "s-1";
             var firstEmpty = new List<AudioSessionInfo>();
             var created = new List<AudioSessionInfo>
             {
-                new AudioSessionInfo { SessionIdentifier = sid, ProcessId = 1, ProcessName = "proc", DisplayName = "proc", Volume = 0.5f, IsMuted = false }
+                new AudioSessionInfo { SessionIdentifier = "group", SessionInstanceIdentifier = sid, ProcessId = 1, ProcessName = "proc", DisplayName = "proc", Volume = 0.5f, IsMuted = false }
             };
             var changed = new List<AudioSessionInfo>
             {
-                new AudioSessionInfo { SessionIdentifier = sid, ProcessId = 1, ProcessName = "proc", DisplayName = "proc", Volume = 0.2f, IsMuted = false }
+                new AudioSessionInfo { SessionIdentifier = "group", SessionInstanceIdentifier = sid, ProcessId = 1, ProcessName = "proc", DisplayName = "proc", Volume = 0.2f, IsMuted = false }
             };
 
             var seq = new Queue<IReadOnlyList<AudioSessionInfo>>();
             seq.Enqueue(firstEmpty); // initial
             seq.Enqueue(created); // created
             seq.Enqueue(changed); // volume changed
+            seq.Enqueue(firstEmpty); // removed
 
             using var svc = new SequenceService(seq);
 
@@ -64,6 +65,36 @@ namespace SoundShell.Unit
             svc.PollSessionsInternal();
             Assert.Single(events);
             Assert.Equal(AudioSessionChangeType.VolumeChanged, events[0].ChangeType);
+            events.Clear();
+
+            svc.PollSessionsInternal();
+            Assert.Single(events);
+            Assert.Equal(AudioSessionChangeType.Removed, events[0].ChangeType);
+        }
+
+        [Fact]
+        public void Polling_Prefers_MutedChanged_When_Mute_And_Volume_Change_Together()
+        {
+            var before = new AudioSessionInfo
+            {
+                SessionInstanceIdentifier = "s-1", ProcessName = "proc", Volume = 0.5f, IsMuted = false
+            };
+            var after = new AudioSessionInfo
+            {
+                SessionInstanceIdentifier = "s-1", ProcessName = "proc", Volume = 0.2f, IsMuted = true
+            };
+            using var svc = new SequenceService(new Queue<IReadOnlyList<AudioSessionInfo>>());
+            var events = new List<AudioSessionChangedEventArgs>();
+            svc.SessionChanged += (_, e) => events.Add(e);
+
+            svc.ApplySnapshot(new[] { before });
+            events.Clear();
+            svc.ApplySnapshot(new[] { after });
+
+            Assert.Single(events);
+            Assert.Equal(AudioSessionChangeType.MutedChanged, events[0].ChangeType);
+            Assert.Equal(0.2f, events[0].Session.Volume);
+            Assert.True(events[0].Session.IsMuted);
         }
     }
 }

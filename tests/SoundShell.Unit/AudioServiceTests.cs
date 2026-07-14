@@ -29,13 +29,13 @@ namespace SoundShell.Unit
             var received = new List<AudioSessionChangedEventArgs>();
             service.SessionChanged += (s, e) => received.Add(e);
 
-            var info = new AudioSessionInfo { SessionIdentifier = "sid-1", ProcessId = 123, ProcessName = "test", DisplayName = "test", Volume = 0.5f, IsMuted = false };
+            var info = new AudioSessionInfo { SessionIdentifier = "group", SessionInstanceIdentifier = "sid-1", ProcessId = 123, ProcessName = "test", DisplayName = "test", Volume = 0.5f, IsMuted = false };
             var args = new AudioSessionChangedEventArgs { Session = info, ChangeType = AudioSessionChangeType.VolumeChanged };
 
             service.Raise(args);
 
             Assert.Single(received);
-            Assert.Equal("sid-1", received[0].Session.SessionIdentifier);
+            Assert.Equal("sid-1", received[0].Session.SessionInstanceIdentifier);
             Assert.Equal(AudioSessionChangeType.VolumeChanged, received[0].ChangeType);
         }
 
@@ -44,11 +44,11 @@ namespace SoundShell.Unit
         {
             var sessions = new List<AudioSessionInfo>
             {
-                new AudioSessionInfo { SessionIdentifier = "s1", ProcessId = 1, ProcessName = "one", DisplayName = "one", Volume = 1.0f },
-                new AudioSessionInfo { SessionIdentifier = "s2", ProcessId = 2, ProcessName = "two", DisplayName = "two", Volume = 1.0f }
+                new AudioSessionInfo { SessionInstanceIdentifier = "s1", ProcessId = 1, ProcessName = "one", DisplayName = "one", Volume = 1.0f },
+                new AudioSessionInfo { SessionInstanceIdentifier = "s2", ProcessId = 2, ProcessName = "two", DisplayName = "two", Volume = 1.0f }
             };
             var service = new FakeAudioSessionService { Sessions = sessions };
-            var resolved = service.GetAudioSessions()[1].SessionIdentifier;
+            var resolved = service.GetAudioSessions()[1].SessionInstanceIdentifier;
 
             Assert.Equal("s2", resolved);
         }

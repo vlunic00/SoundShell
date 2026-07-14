@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SoundShell.PoC", "src\Sound
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SoundShell.Unit", "tests\SoundShell.Unit\SoundShell.Unit.csproj", "{2B7B62A6-65E6-4E2F-9FA8-17A8759322FB}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SoundShell.App", "src\SoundShell.App\SoundShell.App.csproj", "{784C285C-084A-4385-8CF2-0AD7EC7874D7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -60,9 +62,20 @@ Global
 		{2B7B62A6-65E6-4E2F-9FA8-17A8759322FB}.Release|x64.Build.0 = Release|Any CPU
 		{2B7B62A6-65E6-4E2F-9FA8-17A8759322FB}.Release|x86.ActiveCfg = Release|Any CPU
 		{2B7B62A6-65E6-4E2F-9FA8-17A8759322FB}.Release|x86.Build.0 = Release|Any CPU
+		{784C285C-084A-4385-8CF2-0AD7EC7874D7}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{784C285C-084A-4385-8CF2-0AD7EC7874D7}.Debug|Any CPU.Build.0 = Debug|x64
+		{784C285C-084A-4385-8CF2-0AD7EC7874D7}.Debug|x64.ActiveCfg = Debug|x64
+		{784C285C-084A-4385-8CF2-0AD7EC7874D7}.Debug|x64.Build.0 = Debug|x64
+		{784C285C-084A-4385-8CF2-0AD7EC7874D7}.Debug|x86.ActiveCfg = Debug|x64
+		{784C285C-084A-4385-8CF2-0AD7EC7874D7}.Release|Any CPU.ActiveCfg = Release|x64
+		{784C285C-084A-4385-8CF2-0AD7EC7874D7}.Release|Any CPU.Build.0 = Release|x64
+		{784C285C-084A-4385-8CF2-0AD7EC7874D7}.Release|x64.ActiveCfg = Release|x64
+		{784C285C-084A-4385-8CF2-0AD7EC7874D7}.Release|x64.Build.0 = Release|x64
+		{784C285C-084A-4385-8CF2-0AD7EC7874D7}.Release|x86.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{FFA08E7F-9690-42E1-8104-55D5CE2EE3A9} = {0C551FF6-0EED-406E-A3D9-BC6A1785AF97}
 		{AC5A7B51-DF16-4311-954D-65E87B03764A} = {0C551FF6-0EED-406E-A3D9-BC6A1785AF97}
+		{784C285C-084A-4385-8CF2-0AD7EC7874D7} = {0C551FF6-0EED-406E-A3D9-BC6A1785AF97}
 	EndGlobalSection
 EndGlobal

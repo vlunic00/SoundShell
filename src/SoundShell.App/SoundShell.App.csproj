@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk" InitialTargets="PrepareMsixBuildTasks">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>SoundShell.App</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <UseWinUI>true</UseWinUI>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
+    <SelfContained>false</SelfContained>
+    <AppxPackageSigningEnabled Condition="'$(AppxPackageSigningEnabled)' == ''">false</AppxPackageSigningEnabled>
+    <AppxBundle>Never</AppxBundle>
+    <AppxSymbolPackageEnabled>false</AppxSymbolPackageEnabled>
+    <DebugType Condition="'$(GenerateAppxPackageOnBuild)' == 'true'">none</DebugType>
+    <DebugSymbols Condition="'$(GenerateAppxPackageOnBuild)' == 'true'">false</DebugSymbols>
+    <MsixTaskAssemblyLocation>$(MSBuildProjectDirectory)\obj\msix-tools\</MsixTaskAssemblyLocation>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SoundShell.Audio\SoundShell.Audio.csproj" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260317003" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools.MSIX" Version="1.7.20250829.1" PrivateAssets="all" GeneratePathProperty="true" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+    <PackageReference Include="Serilog.Extensions.Logging" Version="3.1.0" />
+    <PackageReference Include="Serilog.Settings.Configuration" Version="3.4.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
+    <PackageDownload Include="System.Security.Permissions" Version="[8.0.0]" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\**" />
+  </ItemGroup>
+
+  <!-- Work around the 1.8.6 MSIX task package omitting its declared runtime assembly under .NET 10. -->
+  <Target Name="PrepareMsixBuildTasks" Condition="'$(PkgMicrosoft_Windows_SDK_BuildTools_MSIX)' != ''">
+    <ItemGroup>
+      <MsixBuildTaskFile Include="$(PkgMicrosoft_Windows_SDK_BuildTools_MSIX)\tools\net6.0\*" />
+      <MsixBuildTaskFile Include="$(PkgMicrosoft_Windows_SDK_BuildTools_MSIX)\..\..\system.security.permissions\8.0.0\lib\net8.0\System.Security.Permissions.dll" />
+    </ItemGroup>
+    <MakeDir Directories="$(MsixTaskAssemblyLocation)" />
+    <Copy SourceFiles="@(MsixBuildTaskFile)" DestinationFolder="$(MsixTaskAssemblyLocation)" SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="DisableMsixSymbolPayload" AfterTargets="_CalculateInputsForGenerateAppxPackageRecipe" Condition="'$(AppxSymbolPackageEnabled)' != 'true'">
+    <ItemGroup>
+      <PDBPayload Remove="@(PDBPayload)" />
+    </ItemGroup>
+  </Target>
+</Project>

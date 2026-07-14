@@ -1,6 +1,7 @@
 # Build output
 bin/
 obj/
+AppPackages/
 
 # VS Code
 .vscode/

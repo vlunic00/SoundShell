@@ -16,7 +16,7 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <FontIcon Glyph="&#xE767;" FontSize="28" />
-            <TextBlock Grid.Column="1" Text="SoundShell" Style="{StaticResource TitleTextBlockStyle}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Text="SoundShell" FontSize="24" VerticalAlignment="Center" />
             <ToggleSwitch Grid.Column="2" Header="Close to tray" IsOn="{x:Bind CloseToTray, Mode=TwoWay}" AutomationProperties.Name="Close to tray" />
         </Grid>
         <Grid Grid.Row="1">
@@ -24,7 +24,7 @@
                 <ItemsControl ItemsSource="{x:Bind ViewModel.Groups, Mode=OneWay}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="local:MixerGroupViewModel">
-                            <Border Padding="16" Margin="0,0,0,8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
+                            <Border Padding="16" Margin="0,0,0,8" CornerRadius="8">
                                 <Grid ColumnSpacing="12">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
@@ -46,9 +46,9 @@
             </ScrollViewer>
             <StackPanel Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVisibilityConverter}}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
                 <FontIcon Glyph="&#xE767;" FontSize="40" />
-                <TextBlock Text="No active audio sessions." Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <TextBlock Text="No active audio sessions." />
             </StackPanel>
-            <InfoBar Visibility="{Binding HasError, Converter={StaticResource BoolToVisibilityConverter}}" IsOpen="True" Severity="Error" Title="SoundShell couldn't access Windows audio" Message="{Binding ErrorMessage}" />
+            <TextBlock Visibility="{Binding HasError, Converter={StaticResource BoolToVisibilityConverter}}" Text="{Binding ErrorMessage}" />
         </Grid>
     </Grid>
 </Window>
